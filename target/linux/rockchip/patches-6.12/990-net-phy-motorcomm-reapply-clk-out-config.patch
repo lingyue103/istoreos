@@ -1,0 +1,21 @@
+--- a/drivers/net/phy/motorcomm.c
++++ b/drivers/net/phy/motorcomm.c
+@@ -1716,6 +1716,18 @@
+ 	if (ret < 0)
+ 		return ret;
+ 
++	/*
++	 * The clock output configuration set up in .probe() is lost whenever the
++	 * PHY is reset.  config_init() runs right after every reset (see
++	 * phy_init_hw()), so re-apply it here.  Without this the YT8531 clock
++	 * output stays at the reset default of 25 MHz, which breaks boards whose
++	 * GMAC reference clock comes from the PHY clock output
++	 * (clock_in_out = "input"), such as the Orange Pi R1 Plus LTS.
++	 */
++	ret = yt8531_probe(phydev);
++	if (ret < 0)
++		return ret;
++
+ 	return 0;
+ }
+ 

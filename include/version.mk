@@ -33,7 +33,7 @@ VERSION_CODE:=$(call qstrip,$(CONFIG_VERSION_CODE))
 VERSION_CODE:=$(if $(VERSION_CODE),$(VERSION_CODE),$(REVISION))
 
 VERSION_REPO:=$(call qstrip,$(CONFIG_VERSION_REPO))
-VERSION_REPO:=$(if $(VERSION_REPO),$(VERSION_REPO),https://downloads.openwrt.org/releases/25.12.5)
+VERSION_REPO:=$(if $(VERSION_REPO),$(VERSION_REPO),https://mirrors.cernet.edu.cn/openwrt/releases/25.12.5)
 
 VERSION_DIST:=$(call qstrip,$(CONFIG_VERSION_DIST))
 VERSION_DIST:=$(if $(VERSION_DIST),$(VERSION_DIST),iStoreOS)

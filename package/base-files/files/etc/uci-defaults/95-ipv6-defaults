@@ -1,0 +1,81 @@
+#!/bin/sh
+#
+# 95-ipv6-defaults  --  由 iStoreOS for Orange Pi R1 Plus LTS 定制
+#
+# 确保固件默认开启 IPv6：
+#   WAN 口(eth0): DHCPv6/SLAAC 客户端 (wan6)
+#   LAN 口(br-lan): RA + DHCPv6 服务器, 下发 /60 前缀 (ULA, 或上游委派的前缀)
+#
+# 本脚本是幂等的：只在缺项/被改错时修正，不覆盖用户已经做过的调整。
+
+. /lib/functions.sh 2>/dev/null
+
+# ---------------------------------------------------------------- WAN 侧 ----
+# wan6: eth0 上的 DHCPv6 客户端，同时接受上游 RA(SLAAC)
+uci -q get network.wan6 >/dev/null || uci set network.wan6=interface
+uci -q get network.wan6.device >/dev/null || uci set network.wan6.device='eth0'
+uci set network.wan6.proto='dhcpv6'
+uci -q get network.wan6.reqaddress >/dev/null || uci set network.wan6.reqaddress='try'
+uci -q get network.wan6.reqprefix  >/dev/null || uci set network.wan6.reqprefix='auto'
+
+# WAN 接口本身允许 IPv6
+if uci -q get network.wan >/dev/null && [ "$(uci -q get network.wan.ipv6)" = "0" ]; then
+	uci set network.wan.ipv6='1'
+fi
+
+# ---------------------------------------------------------------- LAN 侧 ----
+# 从上游委派的前缀里给自己分配 /60（拿不到委派时使用 ULA）
+uci -q get network.lan.ip6assign >/dev/null || uci set network.lan.ip6assign='60'
+
+# ------------------------------------------------- DNS/DHCP 服务端 ---------
+# LAN: 通告 RA + 提供 DHCPv6
+uci -q get dhcp.lan >/dev/null || {
+	uci set dhcp.lan=dhcp
+	uci set dhcp.lan.interface='lan'
+	uci set dhcp.lan.start='100'
+	uci set dhcp.lan.limit='150'
+	uci set dhcp.lan.leasetime='12h'
+}
+[ "$(uci -q get dhcp.lan.ra)" = "disabled" ]      && uci set dhcp.lan.ra='server'
+[ "$(uci -q get dhcp.lan.dhcpv6)" = "disabled" ]  && uci set dhcp.lan.dhcpv6='server'
+uci -q get dhcp.lan.ra >/dev/null      || uci set dhcp.lan.ra='server'
+uci -q get dhcp.lan.dhcpv6 >/dev/null  || uci set dhcp.lan.dhcpv6='server'
+uci -q get dhcp.lan.ra_slaac >/dev/null || uci set dhcp.lan.ra_slaac='1'
+
+# RA 标志位：managed-config 让客户端去找 DHCPv6，other-config 让客户端去取 DNS
+case "$(uci -q get dhcp.lan.ra_flags)" in
+	*managed-config*) ;;
+	*) uci add_list dhcp.lan.ra_flags='managed-config' ;;
+esac
+case "$(uci -q get dhcp.lan.ra_flags)" in
+	*other-config*) ;;
+	*) uci add_list dhcp.lan.ra_flags='other-config' ;;
+esac
+
+# WAN 侧不提供 DHCPv4 服务
+uci -q get dhcp.wan >/dev/null || {
+	uci set dhcp.wan=dhcp
+	uci set dhcp.wan.interface='wan'
+}
+uci set dhcp.wan.ignore='1'
+
+# odhcpd: 只做 IPv6（IPv4 交给 dnsmasq）
+uci -q get dhcp.odhcpd >/dev/null || uci set dhcp.odhcpd=odhcpd
+uci set dhcp.odhcpd.maindhcp='0'
+uci -q get dhcp.odhcpd.leasefile     >/dev/null || uci set dhcp.odhcpd.leasefile='/tmp/odhcpd.leases'
+uci -q get dhcp.odhcpd.leasetrigger  >/dev/null || uci set dhcp.odhcpd.leasetrigger='/usr/sbin/odhcpd-update'
+uci -q get dhcp.odhcpd.loglevel      >/dev/null || uci set dhcp.odhcpd.loglevel='4'
+uci -q get dhcp.odhcpd.piodir        >/dev/null || uci set dhcp.odhcpd.piodir='/tmp/odhcpd-piodir'
+uci -q get dhcp.odhcpd.hostsdir      >/dev/null || uci set dhcp.odhcpd.hostsdir='/tmp/hosts'
+
+# dnsmasq 默认不过滤 AAAA 记录（否则等于对外关掉了 IPv6 解析）
+[ "$(uci -q get dhcp.@dnsmasq[0].filter_aaaa)" = "1" ] && uci set dhcp.@dnsmasq[0].filter_aaaa='0'
+
+uci commit network
+uci commit dhcp
+
+# ---------------------------------------------------------------- 服务 ------ 
+/etc/init.d/odhcpd enable  >/dev/null 2>&1
+/etc/init.d/odhcpd-state enable >/dev/null 2>&1
+
+exit 0

@@ -1,0 +1,88 @@
+#!/bin/sh
+# ============================================================
+#  iStoreOS 扩展包一键安装 (Orange Pi R1 Plus LTS)
+#  用法:
+#     istore-install              安装推荐套件
+#     istore-install <包名> ...   安装指定包
+#     istore-install -l           列出官方源里可安装的包
+#     istore-install -s 关键字    在官方源里搜索
+# ============================================================
+set -u
+
+# 推荐套件: 与 iStoreOS 官方固件一致/常用, 已排除远程访问与 NAS 相关
+DEFAULT_PKGS="
+quickstart
+luci-app-quickstart
+luci-app-diskman
+luci-app-dockermanager
+luci-app-emmc-health
+luci-app-lan-scanner
+luci-app-lan-wake
+luci-app-autotimeset
+"
+
+need_root() {
+	[ "$(id -u)" = "0" ] || { echo "请用 root 运行"; exit 1; }
+}
+
+update_index() {
+	echo ">>> 正在更新软件源索引 ..."
+	if ! apk update 2>&1; then
+		echo ">>> 警告: 部分源更新失败(通常是 kmods 源, 自定义编译的内核模块哈希与官方不一致, 属正常现象)"
+		echo ">>> 正在重试 (忽略失败的源) ..."
+		apk update 2>&1 || true
+	fi
+}
+
+case "${1:-}" in
+-l|--list)
+	need_root; update_index
+	echo ">>> 官方源可用软件包 (部分):"
+	apk search -v 2>/dev/null | sort | head -200
+	exit 0
+	;;
+-s|--search)
+	shift
+	[ $# -ge 1 ] || { echo "用法: istore-install -s 关键字"; exit 1; }
+	need_root; update_index
+	apk search -v "$@" 2>&1
+	exit 0
+	;;
+esac
+
+need_root
+if [ $# -gt 0 ]; then
+	PKGS="$*"
+else
+	PKGS="$DEFAULT_PKGS"
+fi
+
+update_index
+
+echo
+echo ">>> 开始安装: $PKGS"
+OK=""
+FAIL=""
+for p in $PKGS; do
+	printf '>>> 安装 %-26s ... ' "$p"
+	if apk add "$p" >/tmp/istore-install-$p.log 2>&1; then
+		echo "成功"
+		OK="$OK $p"
+	else
+		echo "失败"
+		FAIL="$FAIL $p"
+		sed 's/^/      /' /tmp/istore-install-$p.log | tail -5
+	fi
+done
+
+echo
+echo "==================== 结果 ===================="
+[ -n "$OK" ]   && echo "已安装:$OK"
+[ -n "$FAIL" ] && echo "未安装:$FAIL"
+echo
+echo "提示:"
+echo "  - 刷新 LuCI 页面即可看到新菜单 (必要时执行 /etc/init.d/uhttpd restart)"
+echo "  - 搜索包:  istore-install -s 关键字"
+echo "  - 列出包:  istore-install -l"
+echo "  - 安装单个: istore-install luci-app-xxx"
+exit 0
