@@ -165,10 +165,10 @@ SHA256 : b5ac199c9313f2cbc70a19ff0b39ff274fd1c5c127129c3226de450000acfa25
    | 口 | 设备名 | 位置 |
    |---|---|---|
    | **WAN** | `eth0` | 原生 GMAC + YT8531C，**远离 USB 接口**的那个网口 |
-   | **LAN** | `eth1` | USB 网卡 RTL8153，**与 USB 接口同侧**的那个网口 |
+   | **LAN** | `eth1` | USB 网卡 RTL8153，**靠近 USB 接口**的那个网口 |
 
 3. 上电，首次启动 1~2 分钟（生成配置、初始化 overlay）；
-4. 浏览器打开 **http://192.168.100.1**（不是 192.168.1.1），首次进入会让你**设置 root 密码**。
+4. 浏览器打开 **http://192.168.100.1**，首次进入会让你**设置 root 密码**。
 
 ---
 
@@ -267,40 +267,22 @@ ping 223.5.5.5 → 0% packet loss ✅
 DNS 解析 baidu.com → 正常 ✅
 ```
 
-### IPv6（全新刷入首启）
-
-| 项目 | 结果 |
-|---|---|
-| `network.wan6` | `proto=dhcpv6`, `device=eth0`, `reqaddress=try`, `reqprefix=auto` ✅ |
-| `network.lan.ip6assign` | `60` ✅ |
-| `dhcp.lan` | `ra=server`, `dhcpv6=server`, `ra_slaac=1` ✅ |
-| `dnsmasq filter_aaaa` | `0`（不过滤 AAAA）✅ |
-| 内核 `disable_ipv6` | `0` ✅ |
-| odhcpd / odhcp6c | 运行中，监听 `[::]:547` / `[::]:546` ✅ |
-| **下游主机实测** | 自动获得 SLAAC 地址 + DHCPv6 地址 ✅ |
-
 ---
 
 ## 八、已知限制（如实说明）
 
-1. **WAN 能不能拿到公网 IPv6，取决于你的上游。**
-   本固件侧已全部开启并实测 LAN 侧正常；但在测试环境中，上游路由器发出的 RA 是
-   `router lifetime 0s` 且**不含任何 Prefix Information Option**、也不回应 DHCPv6 ——
-   这是「上游根本没开 IPv6」的特征，换任何固件、任何路由器都是这个结果。
-   只要上游下发前缀，本固件会**自动适配**，无需改设置。
-
-2. **不要用官方 iStoreOS 同版本镜像覆盖升级** —— 那里面没有这个 PHY 补丁，**WAN 会再次失效**。
+1. **不要用官方 iStoreOS 同版本镜像覆盖升级** —— 那里面没有这个 PHY 补丁，**WAN 会再次失效**。
    要升级请用本仓库重新编译。
 
-3. 自编译内核模块的哈希与官方源不一致，`apk update` 时 **kmods 那一行会 404**。
+2. 自编译内核模块的哈希与官方源不一致，`apk update` 时 **kmods 那一行会 404**。
    这是所有自编译 OpenWrt 的共有现象，不影响使用；用户态软件包不受影响。
 
-4. 交付镜像去掉了 sysupgrade 元数据（为了 Etcher 兼容），不适合用 LuCI 的「刷写固件」再刷它。
+3. 交付镜像去掉了 sysupgrade 元数据（为了 Etcher 兼容），不适合用 LuCI 的「刷写固件」再刷它。
    若需要带元数据的版本，自己编译即可（默认产物就是带元数据的）。
 
 ---
 
-## 九、希望能被上游采纳
+## 九、补丁问题详情
 
 这个补丁解决的是一个**通用问题**，不只是这一块板子：
 任何 **`clock_in_out = "input"` + YT8531 系列 PHY（PHY 提供 GMAC 参考时钟）** 的设计，
