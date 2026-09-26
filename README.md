@@ -136,10 +136,8 @@ target/linux/rockchip/patches-6.12/990-net-phy-motorcomm-reapply-clk-out-config.
 |---|---|
 | `feeds-docker-offline-all.patch` | 去掉 `feeds/packages/utils/{docker,dockerd}` 里访问 GitHub 的 commit 校验块，供无法直连 GitHub 的环境离线编译 |
 
-**没有做的事**（避免误解）：
-- 没有塞任何闭源二进制、没有改 Web 界面、没有加私有源；
+**没有做的事**：
 - 没有删减 iStoreOS 的功能；
-- 所有改动都可以用 `git diff upstream/istoreos-25.12` 一眼看全。
 
 ---
 
@@ -153,13 +151,12 @@ istoreos-rockchip-armv8-xunlong_orangepi-r1-plus-lts-squashfs-sysupgrade.img.gz
 SHA256 : b5ac199c9313f2cbc70a19ff0b39ff274fd1c5c127129c3226de450000acfa25
 ```
 
-> 该镜像已去掉 OpenWrt 的尾部 sysupgrade 元数据，这样 **balenaEtcher 不会再报
-> "the writer progress ended unexpectedly"**；解压后与标准版**逐字节相同**（已比对校验）。
-> 代价是不能用 LuCI 的「刷写固件」再刷它（那需要元数据），全新刷机没有任何影响。
+> 该镜像使用balenaEtcher刷写固件时会在最后检查阶段报错，但不影响实际成功，故没有修复。
+> 该镜像不能用 LuCI 的「刷写固件」再刷它（那需要元数据），全新刷机没有任何影响。
 
 **刷机**：
 
-1. 用 ≥ 2 GB 的 TF 卡，balenaEtcher 或 Rufus（Rufus 选 DD 镜像模式）写入；
+1. 用 ≥ 4 GB 的 TF 卡，balenaEtcher 或 Rufus（Rufus 选 DD 镜像模式）写入；
 2. 插入板子，**注意网口对应关系**：
 
    | 口 | 设备名 | 位置 |
@@ -168,8 +165,7 @@ SHA256 : b5ac199c9313f2cbc70a19ff0b39ff274fd1c5c127129c3226de450000acfa25
    | **LAN** | `eth1` | USB 网卡 RTL8153，**靠近 USB 接口**的那个网口 |
 
 3. 上电，首次启动 1~2 分钟（生成配置、初始化 overlay）；
-4. 浏览器打开 **192.168.100.1**（不是 192.168.1.1）。**镜像默认没有密码**（`/etc/shadow` 里 root 为空），
-   首次进入会被要求**设置 root 密码**；设好之后 SSH（`ssh root@192.168.100.1`）用同一个密码登录。
+4. 浏览器打开 **192.168.100.1**，默认账号：root，默认密码：password，首次进入会被要求**设置 root 密码**。
 
 ---
 
@@ -234,7 +230,7 @@ make -j1 V=s 2>&1 | tee build.log
 
 产物在 `bin/targets/rockchip/armv8/`。
 
-### 5) 常见坑（都踩过）
+### 5) 常见坑
 
 | 现象 | 原因 / 处理 |
 |---|---|
@@ -304,7 +300,7 @@ DNS 解析 baidu.com → 正常 ✅
 
 * 本项目是 **[iStoreOS](https://github.com/istoreos/istoreos)** / **OpenWrt** 的衍生作品，
   全部版权归原作者所有，遵循其原有许可（GPL-2.0 等）。
-  本仓库只提供**源码改动**，不主张任何额外权利。
+  本仓库只设置**源码改动**，漏洞修复，未添加原有固件中没有的功能。
 * 内核补丁部分同样以 **GPL-2.0** 发布，欢迎任意使用、转发、上游化。
 * 预置的 iStoreOS 官方扩展源地址归 iStoreOS 官方所有。
 * **仅供学习交流使用**，请遵守当地法律法规；刷机有风险，请自行备份数据。
